@@ -12,7 +12,5 @@ fn main() {
         file_hash_map.insert(path, file_hash);
     }
     println!("\n");
-    for (path, hash) in &file_hash_map {
-        println!("{:?} : {}", path, hash);
-    }
+    println!("{:?}", file_hash_map);
 }

@@ -1,0 +1,1 @@
+# Simple Disk cleaner cli 🗑
