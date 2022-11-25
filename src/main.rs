@@ -1,16 +1,34 @@
+#![allow(warnings, unused)]
 use sha256::digest;
 use std::collections::HashMap;
-use std::fs;
+use std::fs::{self, metadata};
 use std::path::PathBuf;
 
-fn main() {
-    let dir_contents = fs::read_dir("./src").unwrap();
-    let mut file_hash_map: HashMap<PathBuf, String> = HashMap::new();
-    for x in dir_contents {
-        let path = x.unwrap().path();
-        let file_hash = digest(fs::read_to_string(&path).unwrap());
-        file_hash_map.insert(path, file_hash);
+fn print_tree(paths: Vec<PathBuf>) -> Vec<PathBuf> {
+    for path in paths {
+        let metadata = metadata(&path).unwrap();
+        if metadata.is_dir() {
+            let dir_contents = fs::read_dir(&path).unwrap();
+            let mut new_vec: Vec<PathBuf> = Vec::new();
+            for i in dir_contents {
+                new_vec.push(i.expect("unable to get path").path());
+            }
+            print_tree(new_vec);
+        }
+        if metadata.is_file() {
+            println!("{:?}", path);
+        }
     }
-    println!("\n");
-    println!("{:?}", file_hash_map);
+    let mut test: Vec<PathBuf> = Vec::new();
+    test.push(PathBuf::new());
+    return test;
+}
+
+fn main() {
+    let dir_contents = fs::read_dir(".").unwrap();
+    let mut new_vec: Vec<PathBuf> = Vec::new();
+    for i in fs::read_dir(".").unwrap() {
+        new_vec.push(i.unwrap().path());
+    }
+    print_tree(new_vec);
 }
