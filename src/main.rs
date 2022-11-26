@@ -3,6 +3,7 @@ use core::panic;
 use sha256::digest;
 use std::collections::HashMap;
 use std::fs::{self, metadata};
+use std::io::stdin;
 use std::path::PathBuf;
 
 fn get_files(path: PathBuf) -> Vec<PathBuf> {
@@ -42,7 +43,12 @@ fn get_hash_obj(path: PathBuf) -> HashMap<PathBuf, String> {
 
 fn main() {
     let mut path: PathBuf = PathBuf::new();
-    path.push(".");
+    let mut path_string = String::new();
+    stdin()
+        .read_line(&mut path_string)
+        .ok()
+        .expect("failed to read the line");
+    path.push(path_string);
     for (key, value) in get_hash_obj(path) {
         println!("{}", value);
     }
