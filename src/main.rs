@@ -24,21 +24,26 @@ fn get_files(path: PathBuf) -> Vec<PathBuf> {
     return files;
 }
 
-fn get_hash_obj(path: PathBuf) -> HashMap<PathBuf, String> {
+fn get_hash_obj(path: PathBuf) -> (HashMap<PathBuf, String>, Vec<PathBuf>) {
     let mut fileHash: HashMap<PathBuf, String> = HashMap::new();
+    let mut bigFiles: Vec<PathBuf> = Vec::new();
     for i in get_files(path.clone()) {
         let mut compatable: bool = match fs::read_to_string(&i) {
             Ok(file) => true,
             Err(error) => false,
         };
-        if compatable && get_file_size(i.clone()) < 5000000 {
-            fileHash.insert(i.clone(), digest(fs::read_to_string(&i).unwrap()));
+        if get_file_size(i.clone()) < 5000000 {
+            if compatable {
+                fileHash.insert(i.clone(), digest(fs::read_to_string(&i).unwrap()));
+            } else {
+                let bytes = fs::read(&i).unwrap();
+                fileHash.insert(i.clone(), sha256::digest_bytes(&bytes));
+            }
         } else {
-            let bytes = fs::read(&i).unwrap();
-            fileHash.insert(i.clone(), sha256::digest_bytes(&bytes));
+            bigFiles.push(i.clone());
         }
     }
-    return fileHash;
+    return (fileHash, bigFiles);
 }
 
 fn get_file_size(path: PathBuf) -> u64 {
@@ -53,7 +58,7 @@ fn main() {
         .read_line(&mut path_string)
         .expect("failed to read the line");
     path.push(&path_string[..path_string.len() - 1]);
-    for (key, value) in get_hash_obj(path) {
+    for (key, value) in get_hash_obj(path).0 {
         println!("{}", value);
     }
 }
