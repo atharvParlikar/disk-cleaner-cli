@@ -32,7 +32,7 @@ fn get_hash_obj(path: PathBuf) -> (HashMap<PathBuf, String>, Vec<PathBuf>) {
             Ok(file) => true,
             Err(error) => false,
         };
-        if get_file_size(i.clone()) < 5000000 {
+        if get_file_size(i.clone()) < 5000 {
             if compatable {
                 fileHash.insert(i.clone(), digest(fs::read_to_string(&i).unwrap()));
             } else {
@@ -41,6 +41,7 @@ fn get_hash_obj(path: PathBuf) -> (HashMap<PathBuf, String>, Vec<PathBuf>) {
             }
         } else {
             bigFiles.push(i.clone());
+            println!("{:?}", i);
         }
     }
     return (fileHash, bigFiles);
@@ -54,11 +55,12 @@ fn get_file_size(path: PathBuf) -> u64 {
 fn main() {
     let mut path: PathBuf = PathBuf::new();
     let mut path_string = String::new();
+    println!("Enter path :>");
     stdin()
         .read_line(&mut path_string)
         .expect("failed to read the line");
     path.push(&path_string[..path_string.len() - 1]);
-    for (key, value) in get_hash_obj(path).0 {
-        println!("{}", value);
+    for big_file in get_hash_obj(path).1 {
+        println!("{:?}", big_file);
     }
 }
