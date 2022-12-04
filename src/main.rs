@@ -1,11 +1,23 @@
 #![allow(warnings, unused)]
 use clearscreen::clear;
 use core::panic;
+use crossterm::{
+    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
+    execute,
+    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+};
 use sha256::digest;
 use std::collections::HashMap;
 use std::fs::{self, metadata};
 use std::io::stdin;
 use std::path::{self, PathBuf};
+use std::{io, thread, time::Duration};
+use tui::{
+    backend::CrosstermBackend,
+    layout::{Constraint, Direction, Layout},
+    widgets::{Block, Borders, Widget},
+    Terminal,
+};
 
 fn get_files(path: PathBuf) -> Vec<PathBuf> {
     let mut files: Vec<PathBuf> = Vec::new();
@@ -14,8 +26,6 @@ fn get_files(path: PathBuf) -> Vec<PathBuf> {
         let meta = metadata(&path_).unwrap();
         if meta.is_file() {
             files.push(path_.clone());
-            clear();
-            println!("{:?}", path_);
         }
         if meta.is_dir() && path_.to_str().unwrap().to_string().contains("node_modules") == false {
             let files_ = get_files(path_);
@@ -106,21 +116,37 @@ fn print_extension_map(extension_map: &HashMap<String, (i32, u64)>) {
     }
 }
 
-fn main() {
-    let mut path: PathBuf = PathBuf::new();
-    let mut path_string = String::new();
-    println!("Enter path :>");
-    stdin()
-        .read_line(&mut path_string)
-        .expect("failed to read the line");
-    path.push(&path_string[..path_string.len() - 1]);
-    // let mut hashes: Vec<String> = Vec::new();
-    // let mut files: Vec<PathBuf> = Vec::new();
-    // for (file, hash) in get_hash_obj(path).0 {
-    //     if hashes.contains(&hash) {
-    //         println!("{:?}", file);
-    //     } else {
-    //         hashes.push(hash);
-    //     }
-    // }
+fn find_duplicate(file_hashmap: HashMap<PathBuf, String>) -> Vec<PathBuf> {
+    let mut hashes: Vec<String> = Vec::new();
+    let mut duplicate_paths: Vec<PathBuf> = Vec::new();
+    for (file, hash) in file_hashmap {
+        if hashes.contains(&hash) {
+            duplicate_paths.push(file);
+        } else {
+            hashes.push(hash);
+        }
+    }
+    return duplicate_paths;
+}
+
+fn main() -> Result<(), io::Error> {
+    enable_raw_mode()?;
+    let mut stdout = io::stdout();
+    execute!(stdout, EnterAlternateScreen, EnableMouseCapture);
+    let backend = CrosstermBackend::new(stdout);
+    let mut terminal = Terminal::new(backend)?;
+    terminal.draw(|f| {
+        let size = f.size();
+        let block = Block::default().title("Block").borders(Borders::ALL);
+        f.render_widget(block, size);
+    })?;
+    thread::sleep(Duration::from_secs(5));
+    // restore the terminal
+    disable_raw_mode();
+    execute!(
+        terminal.backend_mut(),
+        LeaveAlternateScreen,
+        DisableMouseCapture
+    );
+    Ok(())
 }
