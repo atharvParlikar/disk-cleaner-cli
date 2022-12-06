@@ -5,12 +5,13 @@ use crossterm::{
     event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    Command,
 };
 use sha256::digest;
-use std::collections::HashMap;
 use std::fs::{self, metadata};
 use std::io::stdin;
 use std::path::{self, PathBuf};
+use std::{collections::HashMap, str::Split};
 use std::{io, thread, time::Duration};
 use tui::{
     backend::CrosstermBackend,
@@ -19,15 +20,26 @@ use tui::{
     Terminal,
 };
 
+fn extract_dirname(path: String) -> String {
+    if path.chars().nth(path.len()).unwrap() == '/' {
+        println!("fuck");
+    }
+    "Hello".to_string()
+}
+
 fn get_files(path: PathBuf) -> Vec<PathBuf> {
     let mut files: Vec<PathBuf> = Vec::new();
     for x in fs::read_dir(path).unwrap() {
         let path_ = x.unwrap().path();
         let meta = metadata(&path_).unwrap();
+        let avoid: Vec<String> = vec!["node_modules".to_string(), "target".to_string()];
         if meta.is_file() {
             files.push(path_.clone());
         }
-        if meta.is_dir() && path_.to_str().unwrap().to_string().contains("node_modules") == false {
+
+        let path_str = path_.clone().to_str().unwrap().to_string();
+
+        if meta.is_dir() && false == false {
             let files_ = get_files(path_);
             for file in files_ {
                 files.push(file);
@@ -129,24 +141,55 @@ fn find_duplicate(file_hashmap: HashMap<PathBuf, String>) -> Vec<PathBuf> {
     return duplicate_paths;
 }
 
+fn scan() {
+    println!("enter path:");
+    let mut path_str = "".to_string();
+    stdin().read_line(&mut path_str);
+    path_str.pop();
+    let mut path = PathBuf::new();
+    path.push(path_str);
+    print_extension_map(&get_folder_info(path));
+}
+
 fn main() -> Result<(), io::Error> {
-    enable_raw_mode()?;
-    let mut stdout = io::stdout();
-    execute!(stdout, EnterAlternateScreen, EnableMouseCapture);
-    let backend = CrosstermBackend::new(stdout);
-    let mut terminal = Terminal::new(backend)?;
-    terminal.draw(|f| {
-        let size = f.size();
-        let block = Block::default().title("Block").borders(Borders::ALL);
-        f.render_widget(block, size);
-    })?;
-    thread::sleep(Duration::from_secs(5));
-    // restore the terminal
-    disable_raw_mode();
-    execute!(
-        terminal.backend_mut(),
-        LeaveAlternateScreen,
-        DisableMouseCapture
-    );
+    // enable_raw_mode()?;
+    // let mut stdout = io::stdout();
+    // execute!(stdout, EnterAlternateScreen, EnableMouseCapture);
+    // let backend = CrosstermBackend::new(stdout);
+    // let mut terminal = Terminal::new(backend)?;
+    // terminal.draw(|f| {
+    //     let size = f.size();
+    //     let block = Block::default().title("Block").borders(Borders::ALL);
+    //     f.render_widget(block, size);
+    // })?;
+    // thread::sleep(Duration::from_secs(5));
+    // // restore the terminal
+    // disable_raw_mode();
+    // execute!(
+    //     terminal.backend_mut(),
+    //     LeaveAlternateScreen,
+    //     DisableMouseCapture
+    // );
+
+    while true {
+        println!("enter command :>");
+        let mut command = "".to_string();
+        stdin().read_line(&mut command);
+        command.pop();
+        command = command.trim().to_string();
+        match command.as_str() {
+            "exit" => break,
+            "scan" => scan(),
+            "clear" => clear().unwrap(),
+            "test" => {
+                // let mut test = PathBuf::new();
+                // test.push("/home/atharv/developer/coding");
+                // extract_dirname(test.to_str().unwrap().to_string());
+                let text = "test/";
+                println!("{}", text.chars().nth(text.len()).unwrap());
+            }
+            _ => println!("please enter a vlid command"),
+        }
+    }
     Ok(())
 }
