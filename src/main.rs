@@ -20,11 +20,19 @@ use tui::{
     Terminal,
 };
 
-fn extract_dirname(path: String) -> String {
-    if path.chars().nth(path.len()).unwrap() == '/' {
-        println!("fuck");
+fn extract_dirname(path: PathBuf) -> String {
+    let path_str = path.to_str().unwrap().to_string();
+    let mut dirname: String = "".to_string();
+    let mut left_shift = 1;
+    if path_str.chars().nth(path_str.len() - 1).unwrap() == '/' {
+        left_shift += 1;
     }
-    "Hello".to_string()
+    let mut index = path_str.len() - left_shift;
+    while path_str.chars().nth(index).unwrap() != '/' {
+        dirname.push(path_str.chars().nth(index).unwrap());
+        index -= 1;
+    }
+    return dirname.chars().rev().collect::<String>();
 }
 
 fn get_files(path: PathBuf) -> Vec<PathBuf> {
@@ -182,11 +190,9 @@ fn main() -> Result<(), io::Error> {
             "scan" => scan(),
             "clear" => clear().unwrap(),
             "test" => {
-                // let mut test = PathBuf::new();
-                // test.push("/home/atharv/developer/coding");
-                // extract_dirname(test.to_str().unwrap().to_string());
-                let text = "test/";
-                println!("{}", text.chars().nth(text.len()).unwrap());
+                let mut path_ = PathBuf::new();
+                path_.push("/hola/bitch");
+                println!("{}", extract_dirname(path_));
             }
             _ => println!("please enter a vlid command"),
         }
