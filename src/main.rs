@@ -1,26 +1,27 @@
 #![allow(warnings, unused)]
 use clearscreen::clear;
 use core::panic;
-use crossterm::{
-    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
-    execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
-    Command,
-};
-use sha256::digest;
-use std::fs::{self, metadata};
-use std::io::stdin;
-use std::path::{self, PathBuf};
+use sha256::{digest, digest_file};
 use std::{collections::HashMap, str::Split};
-use std::{io, thread, time::Duration};
-use tui::{
-    backend::CrosstermBackend,
-    layout::{Constraint, Direction, Layout},
-    widgets::{Block, Borders, Widget},
-    Terminal,
+use std::{
+    fs::File,
+    io::{stdin, stdout, BufReader},
+};
+use std::{
+    fs::{self, metadata},
+    ops::Not,
+};
+use std::{io, thread};
+use std::{
+    io::Read,
+    path::{self, PathBuf},
+};
+use std::{
+    io::Write,
+    time::{Duration, Instant},
 };
 
-fn extract_dirname(path: PathBuf) -> String {
+fn extract_dirname(path: &PathBuf) -> String {
     let path_str = path.to_str().unwrap().to_string();
     let mut dirname: String = "".to_string();
     let mut left_shift = 1;
@@ -35,7 +36,7 @@ fn extract_dirname(path: PathBuf) -> String {
     return dirname.chars().rev().collect::<String>();
 }
 
-fn get_files(path: PathBuf) -> Vec<PathBuf> {
+fn get_files(path: &PathBuf) -> Vec<PathBuf> {
     let mut files: Vec<PathBuf> = Vec::new();
     for x in fs::read_dir(path).unwrap() {
         let path_ = x.unwrap().path();
@@ -44,11 +45,9 @@ fn get_files(path: PathBuf) -> Vec<PathBuf> {
         if meta.is_file() {
             files.push(path_.clone());
         }
-
         let path_str = path_.clone().to_str().unwrap().to_string();
-
-        if meta.is_dir() && false == false {
-            let files_ = get_files(path_);
+        if meta.is_dir() && avoid.contains(&extract_dirname(&path_)).not() {
+            let files_ = get_files(&path_);
             for file in files_ {
                 files.push(file);
             }
@@ -57,31 +56,34 @@ fn get_files(path: PathBuf) -> Vec<PathBuf> {
     return files;
 }
 
-fn get_hash_obj(path: PathBuf) -> (HashMap<PathBuf, String>, Vec<PathBuf>) {
-    let mut fileHash: HashMap<PathBuf, String> = HashMap::new();
-    let mut bigFiles: Vec<PathBuf> = Vec::new();
-    let mut counter = 0;
-    let files = get_files(path.clone());
-    for i in &files {
-        let mut compatable: bool = match fs::read_to_string(&i) {
-            Ok(file) => true,
-            Err(error) => false,
-        };
-        if get_file_size(&i) < 5000 {
+fn get_big_file_hash(path: &PathBuf) -> String {
+    let file = File::open(path).unwrap();
+    let mut reader = BufReader::new(file);
+    let mut buffer = [0; 1000];
+    reader.read(&mut buffer);
+    return sha256::digest_bytes(&buffer);
+}
+
+fn get_hash_obj(path: PathBuf) -> HashMap<PathBuf, String> {
+    let mut file_hash: HashMap<PathBuf, String> = HashMap::new();
+    let files = get_files(&path);
+    for i in files {
+        if get_file_size(&i) < 1000 {
+            let mut compatable: bool = match fs::read_to_string(&i) {
+                Ok(file) => true,
+                Err(error) => false,
+            };
             if compatable {
-                fileHash.insert(i.clone(), digest(fs::read_to_string(&i).unwrap()));
+                file_hash.insert(i.clone(), digest_file(&i).unwrap());
             } else {
                 let bytes = fs::read(&i).unwrap();
-                fileHash.insert(i.clone(), sha256::digest_bytes(&bytes));
+                file_hash.insert(i.clone(), sha256::digest_bytes(&bytes));
             }
         } else {
-            bigFiles.push(i.clone());
+            file_hash.insert(i.clone(), get_big_file_hash(&i));
         }
-        clear();
-        println!("{} / {}", counter, files.len());
-        counter += 1;
     }
-    return (fileHash, bigFiles);
+    return file_hash;
 }
 
 fn get_file_size(path: &PathBuf) -> u64 {
@@ -90,7 +92,7 @@ fn get_file_size(path: &PathBuf) -> u64 {
 }
 
 fn get_folder_info(path: PathBuf) -> HashMap<String, (i32, u64)> {
-    let files = get_files(path);
+    let files = get_files(&path);
     let mut extension_map: HashMap<String, (i32, u64)> = HashMap::new();
     for i in files {
         let file_len = i.metadata().unwrap().len();
@@ -159,28 +161,23 @@ fn scan() {
     print_extension_map(&get_folder_info(path));
 }
 
-fn main() -> Result<(), io::Error> {
-    // enable_raw_mode()?;
-    // let mut stdout = io::stdout();
-    // execute!(stdout, EnterAlternateScreen, EnableMouseCapture);
-    // let backend = CrosstermBackend::new(stdout);
-    // let mut terminal = Terminal::new(backend)?;
-    // terminal.draw(|f| {
-    //     let size = f.size();
-    //     let block = Block::default().title("Block").borders(Borders::ALL);
-    //     f.render_widget(block, size);
-    // })?;
-    // thread::sleep(Duration::from_secs(5));
-    // // restore the terminal
-    // disable_raw_mode();
-    // execute!(
-    //     terminal.backend_mut(),
-    //     LeaveAlternateScreen,
-    //     DisableMouseCapture
-    // );
+fn dup() {
+    print!("enter path:");
+    let mut path_str = "".to_string();
+    stdin().read_line(&mut path_str);
+    path_str.pop();
+    let mut path = PathBuf::new();
+    path.push(path_str);
+    let duplicate = find_duplicate(get_hash_obj(path));
+    println!("{:?}", duplicate);
+}
 
+// /home/atharv/Downloads/Video
+
+fn main() -> Result<(), io::Error> {
     while true {
-        println!("enter command :>");
+        print!("enter command :>");
+        stdout().flush();
         let mut command = "".to_string();
         stdin().read_line(&mut command);
         command.pop();
@@ -190,10 +187,20 @@ fn main() -> Result<(), io::Error> {
             "scan" => scan(),
             "clear" => clear().unwrap(),
             "test" => {
-                let mut path_ = PathBuf::new();
-                path_.push("/hola/bitch");
-                println!("{}", extract_dirname(path_));
+                let start = Instant::now();
+                let mut path = PathBuf::new();
+                path.push("/home/atharv/Downloads/Video/");
+
+                // expensive computation
+                for i in get_files(&path) {
+                    println!("{}", get_big_file_hash(&i));
+                }
+
+                let duration = start.elapsed();
+                println!("time taken =>");
+                println!("{:?}", duration);
             }
+            "dup" => dup(),
             _ => println!("please enter a vlid command"),
         }
     }
