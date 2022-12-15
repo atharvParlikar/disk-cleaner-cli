@@ -2,6 +2,7 @@
 use clearscreen::clear;
 use core::panic;
 use sha256::{digest, digest_file};
+use std::io::Stdout;
 use std::{collections::HashMap, str::Split};
 use std::{
     fs::File,
@@ -20,6 +21,8 @@ use std::{
     io::Write,
     time::{Duration, Instant},
 };
+
+static mut TOTAL: i32 = 0;
 
 fn extract_dirname(path: &PathBuf) -> String {
     let path_str = path.to_str().unwrap().to_string();
@@ -41,7 +44,11 @@ fn get_files(path: &PathBuf) -> Vec<PathBuf> {
     for x in fs::read_dir(path).unwrap() {
         let path_ = x.unwrap().path();
         let meta = metadata(&path_).unwrap();
-        let avoid: Vec<String> = vec!["node_modules".to_string(), "target".to_string()];
+        let avoid: Vec<String> = vec![
+            "node_modules".to_string(),
+            "target".to_string(),
+            ".git".to_string(),
+        ];
         if meta.is_file() {
             files.push(path_.clone());
         }
@@ -92,6 +99,8 @@ fn get_file_size(path: &PathBuf) -> u64 {
 }
 
 fn get_folder_info(path: PathBuf) -> HashMap<String, (i32, u64)> {
+    // in the returning touple (i32, u64) i32 is the number of files for that extension
+    // and u64 is the total size of all files combined for that extension (in bytes)
     let files = get_files(&path);
     let mut extension_map: HashMap<String, (i32, u64)> = HashMap::new();
     for i in files {
@@ -130,7 +139,7 @@ fn print_extension_map(extension_map: &HashMap<String, (i32, u64)>) {
         println!(
             "{}{}{}{} -> {}Mb",
             key,
-            " ".repeat(15 - key.len()),
+            " ".repeat(20 - key.len()),
             value.0,
             " ".repeat(4 - value.0.to_string().len()),
             (value.1 / 1000000)
@@ -157,12 +166,15 @@ fn scan() {
     stdin().read_line(&mut path_str);
     path_str.pop();
     let mut path = PathBuf::new();
-    path.push(path_str);
-    print_extension_map(&get_folder_info(path));
+    path.push(path_str.clone());
+    let folderinfo = get_folder_info(path.clone());
+    print_extension_map(&folderinfo);
+    let mut total = 0;
 }
 
 fn dup() {
     print!("enter path:");
+    stdout().flush();
     let mut path_str = "".to_string();
     stdin().read_line(&mut path_str);
     path_str.pop();
@@ -176,7 +188,7 @@ fn dup() {
 
 fn main() -> Result<(), io::Error> {
     while true {
-        print!("enter command :>");
+        print!("enter command :> ");
         stdout().flush();
         let mut command = "".to_string();
         stdin().read_line(&mut command);
@@ -201,6 +213,16 @@ fn main() -> Result<(), io::Error> {
                 println!("{:?}", duration);
             }
             "dup" => dup(),
+            "getFiles" => {
+                let mut path = String::new();
+                print!("Enter path: ");
+                stdout().flush();
+                stdin().read_line(&mut path);
+                path.pop();
+                let mut path_ = PathBuf::new();
+                path_.push(&path);
+                println!("{:?}", get_files(&path_));
+            }
             _ => println!("please enter a vlid command"),
         }
     }

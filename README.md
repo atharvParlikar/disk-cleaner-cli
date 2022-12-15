@@ -3,6 +3,6 @@
 ## TODO
 
 - [X] make it into cli
-- [ ] figure out a way to optimize hashing of larger files
+- [X] figure out a way to optimize hashing of larger files
 - [ ] do something about node_modules and .git folders (make a blacklist maybe?)
 - [ ] add a command to delete node modules
