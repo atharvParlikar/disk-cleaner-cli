@@ -24,6 +24,8 @@ use std::{
 
 static mut TOTAL: i32 = 0;
 
+// utility functions
+
 fn extract_dirname(path: &PathBuf) -> String {
     let path_str = path.to_str().unwrap().to_string();
     let mut dirname: String = "".to_string();
@@ -38,6 +40,34 @@ fn extract_dirname(path: &PathBuf) -> String {
     }
     return dirname.chars().rev().collect::<String>();
 }
+
+fn get_big_file_hash(path: &PathBuf) -> String {
+    let file = File::open(path).unwrap();
+    let mut reader = BufReader::new(file);
+    let mut buffer = [0; 1000];
+    reader.read(&mut buffer);
+    return sha256::digest_bytes(&buffer);
+}
+
+fn get_file_size(path: &PathBuf) -> u64 {
+    let meta = metadata(path).unwrap();
+    return meta.len();
+}
+
+fn print_extension_map(extension_map: &HashMap<String, (i32, u64)>) {
+    for (key, value) in extension_map {
+        println!(
+            "{}{}{}{} -> {}Mb",
+            key,
+            " ".repeat(20 - key.len()),
+            value.0,
+            " ".repeat(4 - value.0.to_string().len()),
+            (value.1 / 1000000)
+        );
+    }
+}
+
+// core functions
 
 fn get_files(path: &PathBuf) -> Vec<PathBuf> {
     let mut files: Vec<PathBuf> = Vec::new();
@@ -63,12 +93,25 @@ fn get_files(path: &PathBuf) -> Vec<PathBuf> {
     return files;
 }
 
-fn get_big_file_hash(path: &PathBuf) -> String {
-    let file = File::open(path).unwrap();
-    let mut reader = BufReader::new(file);
-    let mut buffer = [0; 1000];
-    reader.read(&mut buffer);
-    return sha256::digest_bytes(&buffer);
+fn get_node_modules(path: &PathBuf) -> Vec<PathBuf> {
+    let mut dirs: Vec<PathBuf> = Vec::new();
+    for file in fs::read_dir(path).unwrap() {
+        let path_ = file.unwrap().path();
+        let meta = metadata(&path_).unwrap();
+        if meta.is_dir() {
+            if path_.to_str().unwrap().to_string() == "node_modules".to_string() {
+                dirs.push(path_);
+                return dirs;
+            }
+            println!("{:?}", path_);
+            dirs.push(path_.clone());
+            let dirs_ = get_node_modules(&path_);
+            for x in dirs_ {
+                dirs.push(x);
+            }
+        }
+    }
+    return dirs;
 }
 
 fn get_hash_obj(path: PathBuf) -> HashMap<PathBuf, String> {
@@ -93,14 +136,15 @@ fn get_hash_obj(path: PathBuf) -> HashMap<PathBuf, String> {
     return file_hash;
 }
 
-fn get_file_size(path: &PathBuf) -> u64 {
-    let meta = metadata(path).unwrap();
-    return meta.len();
-}
-
-fn get_folder_info(path: PathBuf) -> HashMap<String, (i32, u64)> {
-    // in the returning touple (i32, u64) i32 is the number of files for that extension
-    // and u64 is the total size of all files combined for that extension (in bytes)
+fn get_folder_info(
+    path: PathBuf,
+) -> HashMap<
+    String,
+    (
+        i32, /* number of files */
+        u64, /* total size of files for specific extension */
+    ),
+> {
     let files = get_files(&path);
     let mut extension_map: HashMap<String, (i32, u64)> = HashMap::new();
     for i in files {
@@ -134,19 +178,6 @@ fn get_folder_info(path: PathBuf) -> HashMap<String, (i32, u64)> {
     return extension_map;
 }
 
-fn print_extension_map(extension_map: &HashMap<String, (i32, u64)>) {
-    for (key, value) in extension_map {
-        println!(
-            "{}{}{}{} -> {}Mb",
-            key,
-            " ".repeat(20 - key.len()),
-            value.0,
-            " ".repeat(4 - value.0.to_string().len()),
-            (value.1 / 1000000)
-        );
-    }
-}
-
 fn find_duplicate(file_hashmap: HashMap<PathBuf, String>) -> Vec<PathBuf> {
     let mut hashes: Vec<String> = Vec::new();
     let mut duplicate_paths: Vec<PathBuf> = Vec::new();
@@ -159,6 +190,8 @@ fn find_duplicate(file_hashmap: HashMap<PathBuf, String>) -> Vec<PathBuf> {
     }
     return duplicate_paths;
 }
+
+// cli functions
 
 fn scan() {
     println!("enter path:");
@@ -184,8 +217,6 @@ fn dup() {
     println!("{:?}", duplicate);
 }
 
-// /home/atharv/Downloads/Video
-
 fn main() -> Result<(), io::Error> {
     while true {
         print!("enter command :> ");
@@ -207,6 +238,7 @@ fn main() -> Result<(), io::Error> {
                 for i in get_files(&path) {
                     println!("{}", get_big_file_hash(&i));
                 }
+                // expensive computing end
 
                 let duration = start.elapsed();
                 println!("time taken =>");
@@ -222,6 +254,16 @@ fn main() -> Result<(), io::Error> {
                 let mut path_ = PathBuf::new();
                 path_.push(&path);
                 println!("{:?}", get_files(&path_));
+            }
+            "node_modules" => {
+                let mut path = String::new();
+                print!("Enter path: ");
+                stdout().flush();
+                stdin().read_line(&mut path);
+                path.pop();
+                let mut path_ = PathBuf::new();
+                path_.push(&path);
+                println!("{:?}", get_node_modules(&path_));
             }
             _ => println!("please enter a vlid command"),
         }
